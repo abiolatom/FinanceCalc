@@ -4,21 +4,10 @@ import {calculateLoanTerm} from '@/ai/flows/calculate-loan-term';
 import {generateComparativeReport} from '@/ai/flows/generate-comparative-report';
 import {Icons} from '@/components/icons';
 import {Button} from '@/components/ui/button';
-<<<<<<< HEAD
-import {Checkbox} from '@/components/ui/checkbox';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-=======
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
->>>>>>> 53c0304a8c46ff835d69e2210b5946cdc72cdd66
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Separator} from '@/components/ui/separator';
@@ -243,66 +232,6 @@ export default function Home() {
               onChange={e => setInsuranceAmount(e.target.value === '' ? undefined : Number(e.target.value))}
             />
           </div>
-<<<<<<< HEAD
-            <div className="grid gap-2">
-              <Label htmlFor="securityDeposit">Security Deposit</Label>
-              <Input
-                type="number"
-                id="securityDeposit"
-                value={securityDeposit}
-                onChange={e => setSecurityDeposit(Number(e.target.value))}
-              />
-            </div>
-            <div className="grid gap-2 flex items-center">
-              <Label htmlFor="securityDepositRepayable">
-                Security Deposit Repayable?
-              </Label>
-              <Checkbox
-                id="securityDepositRepayable"
-                checked={securityDepositRepayable}
-                onCheckedChange={e => setSecurityDepositRepayable(e)}
-              />
-            </div>
-             <div className="grid gap-2">
-              <Label htmlFor="canRenew">
-                Loan can be Renewed?
-              </Label>
-              <Checkbox
-                id="canRenew"
-                checked={canRenew}
-                onCheckedChange={e => setCanRenew(e)}
-              />
-            </div>
-              {canRenew && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="loanRenewalPercentage">Loan Renewal Percentage (%)</Label>
-                    <Input
-                      type="number"
-                      id="loanRenewalPercentage"
-                      placeholder="Optional"
-                      value={loanRenewalPercentage || ''}
-                      onChange={e =>
-                        setLoanRenewalPercentage(Number(e.target.value) || undefined)
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="loanRenewalFixedCost">Loan Renewal Fixed Cost</Label>
-                    <Input
-                      type="number"
-                      id="loanRenewalFixedCost"
-                      placeholder="Optional"
-                      value={loanRenewalFixedCost || ''}
-                      onChange={e =>
-                        setLoanRenewalFixedCost(Number(e.target.value) || undefined)
-                      }
-                    />
-                  </div>
-                </>
-              )}
-=======
->>>>>>> 53c0304a8c46ff835d69e2210b5946cdc72cdd66
           <div className="grid gap-2">
             <Label htmlFor="securityDeposit">Security Deposit</Label>
             <Input
@@ -317,31 +246,6 @@ export default function Home() {
             <Label htmlFor="securityDepositRepayable">
               Security Deposit Repayable?
             </Label>
-<<<<<<< HEAD
-            <div className="flex items-center space-x-2">
-              <Input
-                type="number"
-                id="monthlyRepaymentAmount"
-                placeholder="Optional"
-                value={monthlyRepaymentAmount || ''}
-                onChange={e =>
-                  setMonthlyRepaymentAmount(
-                    Number(e.target.value) || undefined
-                  )
-                }
-              />
-              <Label htmlFor="monthlyRepaymentIsPercentage" className="text-nowrap">
-                Is Percentage?
-              </Label>
-              <Checkbox
-                id="monthlyRepaymentIsPercentage"
-                checked={monthlyRepaymentIsPercentage}
-                onCheckedChange={e =>
-                  setMonthlyRepaymentIsPercentage(e)
-                }
-              />
-            </div>
-=======
             <Checkbox
               id="securityDepositRepayable"
               checked={securityDepositRepayable}
@@ -365,7 +269,6 @@ export default function Home() {
               checked={monthlyRepaymentIsPercentage}
               onCheckedChange={checked => setMonthlyRepaymentIsPercentage(!!checked)}
             />
->>>>>>> 53c0304a8c46ff835d69e2210b5946cdc72cdd66
           </div>
           <div className="grid gap-2">
             <Label htmlFor="loanTermMonths">Loan Term (Months)</Label>
@@ -377,21 +280,6 @@ export default function Home() {
               onChange={e => setLoanTermMonths(Number(e.target.value))}
             />
           </div>
-<<<<<<< HEAD
-           <div className="grid gap-2">
-              <Label htmlFor="loanAmountPaidAtTermEnd">
-                Loan Amount Paid At Term End?
-              </Label>
-              <Checkbox
-                id="loanAmountPaidAtTermEnd"
-                checked={loanAmountPaidAtTermEnd}
-                onCheckedChange={e => setLoanAmountPaidAtTermEnd(e)}
-              />
-            </div>
-
-          {/* Extra Loan Costs Section */}
-          <div className="mb-4">
-=======
           <div className="grid gap-2">
             <Label htmlFor="loanAmountPaidAtTermEnd">Loan Amount Paid At Term End?</Label>
             <Checkbox
@@ -433,7 +321,6 @@ export default function Home() {
             </>
           )}
           <div>
->>>>>>> 53c0304a8c46ff835d69e2210b5946cdc72cdd66
             <Label>Extra Loan Costs</Label>
             {extraLoanCosts.map((cost, index) => (
               <div key={index} className="flex items-center space-x-2 mb-2">
