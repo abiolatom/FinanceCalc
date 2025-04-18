@@ -8,8 +8,8 @@ import {useRouter} from 'next/navigation';
 import {useEffect} from 'react';
 
 export default function LoginPage() {
-  const [user, loading, error] = useAuthState(auth);
   const router = useRouter();
+  const [user, loading, error] = useAuthState(auth);
 
   useEffect(() => {
     if (user) {
@@ -60,3 +60,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
