@@ -9,7 +9,8 @@ import {useEffect} from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [user, loading, error] = useAuthState(auth);
+  // Move useAuthState hook inside the component and make it conditional
+  const [user, loading, error] = auth ? useAuthState(auth) : [null, true, null];
 
   useEffect(() => {
     if (user) {
