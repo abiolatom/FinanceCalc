@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export {metadata};
+//export {metadata};
 
 export default function RootLayout({
   children,
@@ -27,11 +27,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        
+         <AuthProvider>
+          <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           <Header/>
             {children}
-        
-      </body>
+          </div>
+         </AuthProvider>
+       </body>
     </html>
   );
 }
@@ -47,7 +49,7 @@ function Header() {
         </Link>
         <div>
           {user ? (
-            <Link href="/login" className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mr-2">
+            <Link href="/" className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mr-2">
               Log Out
             </Link>
           ) : (
@@ -65,4 +67,5 @@ function Header() {
     </nav>
   );
 }
+
 
