@@ -2,15 +2,18 @@
 
 import {Button} from '@/components/ui/button';
 import {auth, googleAuthProvider} from '@/config/firebase';
-import {signInWithPopup, signOut} from 'firebase/auth';
+import {createUserWithEmailAndPassword, signInWithPopup, signOut} from 'firebase/auth';
 import {useAuthState} from 'react-firebase-hooks/auth';
 import {useRouter} from 'next/navigation';
 import {useEffect} from 'react';
+import {useState} from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
-  // Move useAuthState hook inside the component and make it conditional
-  const [user, loading, error] = auth ? useAuthState(auth) : [null, true, null];
+  const [user, loading, error] = useAuthState(auth);
+  const [isSignUp, setIsSignUp] = useState(false); // Track if it's sign-up or login
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -39,6 +42,10 @@ export default function LoginPage() {
     }
   };
 
+  const handleToggleSignUp = () => {
+    setIsSignUp(!isSignUp);
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -49,14 +56,16 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col items-center justify-center h-screen">
-      <h1 className="text-2xl font-bold mb-4">Login</h1>
+      <h1 className="text-2xl font-bold mb-4">{isSignUp ? 'Sign Up' : 'Login'}</h1>
       {user ? (
         <>
           <p>Welcome, {user.displayName}!</p>
           <Button onClick={signOutWithGoogle}>Sign Out</Button>
         </>
       ) : (
-        <Button onClick={signInWithGoogle}>Sign In with Google</Button>
+        <>
+          <Button onClick={signInWithGoogle}>Sign In with Google</Button>
+        </>
       )}
     </div>
   );
