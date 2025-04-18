@@ -8,7 +8,7 @@ import {useRouter} from 'next/navigation';
 export const AuthContext = createContext<any>(null);
 
 export const AuthProvider = ({children}: { children: React.ReactNode }) => {
-  const [user, loading, error] = useAuthState(auth);
+  const [user, loading, error] = auth ? useAuthState(auth) : [null, false, null];
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
 
@@ -38,3 +38,4 @@ export const AuthProvider = ({children}: { children: React.ReactNode }) => {
 export const useAuth = () => {
   return useContext(AuthContext);
 };
+
