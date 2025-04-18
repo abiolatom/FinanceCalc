@@ -1,6 +1,5 @@
 'use client';
 
-import {generateComparativeReport} from '@/ai/flows/generate-comparative-report';
 import {Button} from '@/components/ui/button';
 import {
   Card,
@@ -36,12 +35,28 @@ export default function ReportPage() {
   }, [financeOptionsParam]);
 
   useEffect(() => {
-    const generateReport = async () => {
+    const fetchReport = async () => {
       if (financeOptions.length > 0) {
         try {
-          const report = await generateComparativeReport({
-            financeOptions,
+          const response = await fetch('/api/finance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'generateComparativeReport',
+              financeOptions: financeOptions,
+            }),
           });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.error || 'Failed to generate comparative report'
+            );
+          }
+
+          const report = await response.json();
           setComparativeReport(report.comparativeReport);
         } catch (error: any) {
           console.error('Error generating comparative report:', error.message);
@@ -52,8 +67,8 @@ export default function ReportPage() {
       }
     };
 
-    generateReport();
-   }, [financeOptions]);
+    fetchReport();
+  }, [financeOptions]);
 
   const handleBackClick = () => {
     router.push('/');
