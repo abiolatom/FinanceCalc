@@ -11,6 +11,8 @@ import {
 import {Textarea} from '@/components/ui/textarea';
 import {useRouter, useSearchParams} from 'next/navigation';
 import {useEffect, useState} from 'react';
+import {auth, db} from '@/config/firebase';
+import {useAuthState} from 'react-firebase-hooks/auth';
 
 export default function ReportPage() {
   const searchParams = useSearchParams();
@@ -18,6 +20,7 @@ export default function ReportPage() {
   const [comparativeReport, setComparativeReport] = useState<string>('');
   const [financeOptions, setFinanceOptions] = useState<any[]>([]);
   const router = useRouter();
+   const [user, loading, error] = useAuthState(auth);
 
   useEffect(() => {
     if (financeOptionsParam) {
@@ -71,13 +74,31 @@ export default function ReportPage() {
   }, [financeOptions]);
 
   const handleBackClick = () => {
-    router.push('/');
+    router.push('/calculator');
   };
+
+  useEffect(() => {
+    if (!user && !loading) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+   if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error.message}</div>;
+  }
+
+  if (!user) {
+    return null; // or a loading indicator
+  }
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Comparative Report</h1>
-
+       <Button onClick={() => router.push('/calculator')}>Go to Calculator Page</Button>
       <Card>
         <CardHeader>
           <CardTitle>AI-Generated Analysis</CardTitle>
@@ -92,8 +113,8 @@ export default function ReportPage() {
             className="min-h-[300px]"
           />
         </CardContent>
-      </Card>
-      <Button onClick={handleBackClick}>Back to Calculator Page</Button>
+       </Card>
+       <Button onClick={handleBackClick}>Back to Calculator Page</Button>
      </div>
   );
 }
