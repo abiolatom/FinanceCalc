@@ -4,7 +4,6 @@ import './globals.css';
 import {AuthProvider} from '@/components/AuthProvider';
 import React from 'react';
 import Header from '@/components/Header';
-// import Header from '@/components/Header/Header';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
