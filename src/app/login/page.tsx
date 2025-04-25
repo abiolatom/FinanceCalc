@@ -8,9 +8,22 @@ import {useRouter} from 'next/navigation';
 import {useEffect, useState} from 'react';
 
 export default function LoginPage() {
+  const [user, setUser] = useState<any>(null); // Set user to null initially
+  const [loading, setLoading] = useState<boolean>(false); // Set loading to false initially
+  const [error, setError] = useState<any>(null); // Set error to null initially
   const router = useRouter();
-  const [user, loading, error] = useAuthState(auth);
+  
+  
   const [isSignUp, setIsSignUp] = useState(false); // State to toggle between sign-in and sign-up
+
+  useEffect(() => {
+    if (auth) {
+      const [userAuth, loadingAuth, errorAuth] = useAuthState(auth);
+      setUser(userAuth);
+      setLoading(loadingAuth);
+      setError(errorAuth);
+    }
+  }, [auth]);
 
   const signInWithGoogle = async () => {
     try {

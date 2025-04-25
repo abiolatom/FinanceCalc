@@ -1,8 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-
-let firebaseApp: FirebaseApp;
 
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
@@ -12,64 +10,55 @@ const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
 const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 const measurementId = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID;
 
-let missingConfig = false;
+let auth: any = null;
+let db: any = null;
+let googleAuthProvider: any = null;
+let firebaseApp: FirebaseApp | null = null;
 
-if (!apiKey) {
-  console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_API_KEY");
-  missingConfig = true;
-}
-if (!authDomain) {
-  console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
-   missingConfig = true;
-}
-if (!projectId) {
-  console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_PROJECT_ID");
-   missingConfig = true;
-}
-if (!storageBucket) {
-  console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET");
-   missingConfig = true;
-}
-if (!messagingSenderId) {
-  console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID");
-   missingConfig = true;
-}
-if (!appId) {
-  console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_APP_ID");
-  missingConfig = true;
-}
-
-const firebaseConfig = {
-  apiKey: apiKey,
-  authDomain: authDomain,
-  projectId: projectId,
-  storageBucket: storageBucket,
-  messagingSenderId: messagingSenderId,
-  appId: appId,
-  measurementId: measurementId,
-};
-
-if (getApps().length === 0 && !missingConfig) {
-  try {
-    firebaseApp = initializeApp(firebaseConfig);
-    console.log("Firebase initialized successfully!");
-  } catch (error: any) {
-    console.error("Failed to initialize Firebase:", error);
-    // Don't throw an error here, as it prevents the app from rendering.
-    // Instead, log the error and allow the app to continue (with limited functionality).
+try {
+  if (!apiKey || !authDomain || !projectId || !storageBucket || !messagingSenderId || !appId) {
+    if (!apiKey) {
+      console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_API_KEY");
+    }
+    if (!authDomain) {
+      console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
+    }
+    if (!projectId) {
+      console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_PROJECT_ID");
+    }
+    if (!storageBucket) {
+      console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET");
+    }
+    if (!messagingSenderId) {
+      console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID");
+    }
+    if (!appId) {
+      console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_APP_ID");
+    }
+    throw new Error('Missing Firebase configuration variables.');
   }
-} else {
-  firebaseApp = getApps()[0];
-}
 
-let auth: any;
-let db: any;
-let googleAuthProvider: any;
+  const firebaseConfig = {
+    apiKey,
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId,
+    appId,
+    measurementId,
+  };
 
-if (firebaseApp) {
+  firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+
+  console.log("Firebase initialized successfully!");
+
   auth = getAuth(firebaseApp);
   db = getFirestore(firebaseApp);
   googleAuthProvider = new GoogleAuthProvider();
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+  // Handle the error appropriately, e.g., set a flag to indicate Firebase is not available
 }
 
 export { auth, db, googleAuthProvider, firebaseApp };
+
