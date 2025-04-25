@@ -2,11 +2,10 @@
 
 import {Button} from '@/components/ui/button';
 import {auth, googleAuthProvider} from '@/config/firebase';
-import {createUserWithEmailAndPassword, signInWithPopup, signOut, updateProfile} from 'firebase/auth';
+import {signInWithPopup, updateProfile} from 'firebase/auth';
 import {useAuthState} from 'react-firebase-hooks/auth';
 import {useRouter} from 'next/navigation';
 import {useEffect, useState} from 'react';
-import {Google} from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -49,7 +48,6 @@ export default function LoginPage() {
       <div>
         <h2 className="text-2xl font-semibold mb-4">{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
         <Button onClick={signInWithGoogle} className="mb-4">
-          <Google className="mr-2 h-4 w-4" />
           Sign In with Google
         </Button>
         <Button variant="secondary" onClick={toggleSignUp}>
@@ -59,3 +57,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
