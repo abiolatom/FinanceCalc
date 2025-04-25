@@ -67,3 +67,4 @@ if (typeof window !== 'undefined') {
 }
 
 export { auth, db, googleAuthProvider, firebaseApp };
+
