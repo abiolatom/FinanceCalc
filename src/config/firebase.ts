@@ -37,26 +37,29 @@ if (typeof window !== 'undefined') {
       if (!appId) {
         console.warn("Firebase configuration is missing: NEXT_PUBLIC_FIREBASE_APP_ID");
       }
-      throw new Error('Missing Firebase configuration variables.');
+      console.error('Missing Firebase configuration variables.');
+      // Do not throw error in the client, continue with firebaseApp as null
     }
 
-    const firebaseConfig = {
-      apiKey,
-      authDomain,
-      projectId,
-      storageBucket,
-      messagingSenderId,
-      appId,
-      measurementId,
-    };
+    if (!firebaseApp && apiKey && authDomain && projectId && storageBucket && messagingSenderId && appId) {
+      const firebaseConfig = {
+        apiKey,
+        authDomain,
+        projectId,
+        storageBucket,
+        messagingSenderId,
+        appId,
+        measurementId,
+      };
 
-    firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+      firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-    console.log("Firebase initialized successfully!");
+      console.log("Firebase initialized successfully!");
 
-    auth = getAuth(firebaseApp);
-    db = getFirestore(firebaseApp);
-    googleAuthProvider = new GoogleAuthProvider();
+      auth = getAuth(firebaseApp);
+      db = getFirestore(firebaseApp);
+      googleAuthProvider = new GoogleAuthProvider();
+    }
   } catch (error) {
     console.error("Firebase initialization error:", error);
     // Handle the error appropriately, e.g., set a flag to indicate Firebase is not available
