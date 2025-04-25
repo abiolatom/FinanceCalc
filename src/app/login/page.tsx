@@ -2,29 +2,28 @@
 
 import {Button} from '@/components/ui/button';
 import {auth, googleAuthProvider} from '@/config/firebase';
-import {createUserWithEmailAndPassword, signInWithPopup, signOut} from 'firebase/auth';
+import {createUserWithEmailAndPassword, signInWithPopup, signOut, updateProfile} from 'firebase/auth';
 import {useAuthState} from 'react-firebase-hooks/auth';
 import {useRouter} from 'next/navigation';
 import {useEffect} from 'react';
-import {useState} from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [user, loading, error] = useAuthState(auth);
-  const [isSignUp, setIsSignUp] = useState(false); // Track if it's sign-up or login
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  useEffect(() => {
-    if (user) {
-      router.push('/calculator');
-    }
-  }, [user, router]);
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleAuthProvider);
-      // After successful sign-in, the useEffect hook above will redirect to the calculator page
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      const user = result.user;
+
+      // Check if the user is new
+      if (result.additionalUserInfo?.isNewUser) {
+        // Update the user's display name
+        await updateProfile(user, {
+          displayName: user.displayName,
+        });
+      }
+      router.push('/calculator');
     } catch (error: any) {
       console.error('Error signing in with Google', error);
       alert(`Error signing in with Google: ${error.message}`);
@@ -34,33 +33,29 @@ export default function LoginPage() {
   const signOutWithGoogle = async () => {
     try {
       await signOut(auth);
-      // After successful sign-out, you might want to redirect to the login page or refresh the current page
       router.push('/login');
     } catch (error: any) {
-      console.error('Error signing out with Google', error);
+      console.error('Error signing out with Google', error.message);
       alert(`Error signing out with Google: ${error.message}`);
     }
   };
 
-  const handleToggleSignUp = () => {
-    setIsSignUp(!isSignUp);
-  };
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (error) {
-    return <div>Error: {error.message}</div>;
-  }
+  useEffect(() => {
+    if (user) {
+      router.push('/calculator');
+    } else if (!loading && !error) {
+      // stay on login page
+    }
+  }, [user, loading, error, router]);
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
-      <h1 className="text-2xl font-bold mb-4">{isSignUp ? 'Sign Up' : 'Login'}</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      {loading && <p>Loading...</p>}
+      {error && <p>Error: {error.message}</p>}
       {user ? (
         <>
           <p>Welcome, {user.displayName}!</p>
-          <Button onClick={signOutWithGoogle}>Sign Out</Button>
+          <Button onClick={() => signOut(auth)}>Sign Out</Button>
         </>
       ) : (
         <>
@@ -70,4 +65,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

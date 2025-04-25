@@ -1,7 +1,11 @@
 import { PlusCircle} from 'lucide-react';
+ 
 
-const Icons = {
+ const Icons = {
   plusCircle: PlusCircle,
-};
+ };
+ 
 
-export {Icons};
+ export {Icons};
+ 
+
