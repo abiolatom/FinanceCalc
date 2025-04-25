@@ -28,82 +28,21 @@
    const [loanRenewalPercentage, setLoanRenewalPercentage] = useState<number | undefined>(undefined);
    const [loanRenewalFixedCost, setLoanRenewalFixedCost] = useState<number | undefined>(undefined);
    const [showResults, setShowResults] = useState<boolean>(false);
-@@ -64,6 +64,7 @@
+@@ -64,6 +64,11 @@
    const router = useRouter();
    const searchParams = useSearchParams();
     const [user, loading, error] = useAuthState(auth);
 +
++    useEffect(() => {
++    if (!user && !loading) {
++      router.push('/login');
++    }
++  }, [user, loading, router]);
  
 
    const createQueryString = (name: string, value: string) => {
      const params = new URLSearchParams(searchParams);
-@@ -186,7 +187,7 @@
- 
-   const handleDeleteFinanceOption = async (index: number) => {
-     if (!user) {
--      alert("You must be logged in to delete finance options.");
-+      alert('You must be logged in to delete finance options.');
-       return;
-     }
- 
-@@ -248,12 +249,11 @@
-     router.push(url);
-   };
- 
-
-    useEffect(() => {
-     const fetchFinanceOptions = async () => {
--      if (user) {
-         try {
-           const userRef = doc(db, "users", user.uid);
-           const financeOptionsCollection = collection(userRef, "financeOptions");
-@@ -265,20 +265,15 @@
-           });
-           setFinanceOptions(fetchedOptions);
-         } catch (error: any) {
--          console.error("Error fetching finance options:", error.message);
-+          console.error('Error fetching finance options:', error.message);
-           alert("Failed to fetch finance options.");
-         }
--      }
-     };
- 
-
-     if (user) {
-       fetchFinanceOptions();
-     }
--  }, [user]);
--
--  useEffect(() => {
--    if (!user && !loading) {
--      router.push('/login');
-     }
-   }, [user, loading, router]);
- 
-@@ -502,7 +497,7 @@
-           <h2 className="text-xl font-bold mb-4">Finance Options Added:</h2>
-           <div className="grid gap-4">
-             {financeOptions.map((option, index) => (
--              <Card key={index}>
-+               <Card key={index}>
-                 <CardHeader>
-                   <CardTitle>{option.financeSourceName || `Option ${index + 1}`}</CardTitle>
-                   <CardDescription>Details of the finance option:</CardDescription>
-@@ -523,11 +518,13 @@
-                       <p>Cost of Finance: {option.loanTerms.costOfFinance}</p>
-                     </>
-                   )}
-+                 
-                   <div className="flex space-x-2">
-                     <Button size="sm" onClick={() => handleEditFinanceOption(index, option)}>Edit</Button>
-                     <Button size="sm" variant="destructive" onClick={() => handleDeleteFinanceOption(index)}>Delete</Button>
-                   </div>
-                 </CardContent>
-+
-               </Card>
-             ))}
-           </div>
-@@ -535,6 +532,7 @@
+@@ -534,6 +539,7 @@
          </>
        )}
      </div>
