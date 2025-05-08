@@ -1,8 +1,8 @@
 'use client';
 
-import type { FinanceOption } from '@/types/finance'; // CalculatedTerms might need to be defined or imported if used explicitly
-import { calculateLoanTerm, CalculateLoanTermOutput } from '@/ai/flows/calculate-loan-term';
-import { generateComparativeReport } from '@/ai/flows/generate-comparative-report';
+import type { CalculateLoanTermOutput } from '@/ai/flows/calculate-loan-term';
+import { calculateLoanTerm } from '@/ai/flows/calculate-loan-term';
+// import { generateComparativeReport } from '@/ai/flows/generate-comparative-report'; // Not used directly on this page for report generation submission
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,20 +12,10 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-// Dialog components are not used in this version, can be removed if not planned for immediate use
-// import {
-//   Dialog,
-//   DialogContent,
-//   DialogDescription,
-//   DialogHeader,
-//   DialogTitle,
-//   DialogTrigger,
-// } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -36,19 +26,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-// Label is not directly used, FormLabel is used instead
-// import { Label } from '@/components/ui/label';
-// Select components are not used in this version
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-// Textarea is not used in this version
-// import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { IconButton } from '@/components/icon-button';
@@ -62,12 +40,12 @@ const extraLoanCostSchema = z.object({
   name: z.string().min(1, 'Cost name is required'),
   amount: z.preprocess(
     (val) => (val === '' || val === undefined || val === null ? undefined : Number(val)),
-    z.number({ invalid_type_error: 'Must be a number' }).positive('Must be positive').optional() // Made optional to align with default value
+    z.number({ invalid_type_error: 'Must be a number' }).positive('Must be positive').optional()
   ),
 });
 
 const financeOptionSchema = z.object({
-  id: z.string().optional(), // For Firestore document ID
+  id: z.string().optional(), 
   financeSourceName: z.string().min(1, 'Finance source name is required'),
   loanAmount: z.preprocess(
     (val) => (val === '' ? undefined : Number(val)),
@@ -116,28 +94,39 @@ const financeOptionSchema = z.object({
 type FinanceFormData = z.infer<typeof financeOptionSchema>;
 
 // Helper function to convert undefined values to null for Firestore
-function convertToFirestoreCompatible(obj: any): any {
-  if (obj === undefined) {
+function convertToFirestoreCompatible(item: any): any {
+  if (item === undefined) {
     return null;
   }
-  if (Array.isArray(obj)) {
-    return obj.map(convertToFirestoreCompatible);
+  if (item === null || typeof item !== 'object') {
+    // Primitives or null
+    return item;
   }
-  if (typeof obj === 'object' && obj !== null) {
-    const newObj: Record<string, any> = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        newObj[key] = convertToFirestoreCompatible(obj[key]);
-      }
+
+  if (Array.isArray(item)) {
+    // If an array element is undefined, map will pass undefined to the recursive call,
+    // which will then return null for that element.
+    return item.map(subItem => convertToFirestoreCompatible(subItem));
+  }
+
+  // It's an object
+  const newObj: Record<string, any> = {};
+  // Iterate over own enumerable properties
+  for (const key of Object.keys(item)) {
+    const value = item[key];
+    // Explicitly convert undefined properties of objects to null
+    if (value === undefined) {
+      newObj[key] = null;
+    } else {
+      newObj[key] = convertToFirestoreCompatible(value);
     }
-    return newObj;
   }
-  return obj;
+  return newObj;
 }
 
 
 function CalculatorPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, firebaseReady } = useAuth();
   const router = useRouter();
   const [financeOptions, setFinanceOptions] = useState<FinanceFormData[]>([]);
   const [editingOption, setEditingOption] = useState<FinanceFormData | null>(null);
@@ -173,14 +162,19 @@ function CalculatorPage() {
   });
 
   const fetchFinanceOptions = useCallback(async () => {
-    if (user && db) {
+    if (user && db && firebaseReady) {
       setIsLoadingOptions(true);
       try {
         const q = query(collection(db, "financeOptions"), where("userId", "==", user.uid));
         const querySnapshot = await getDocs(q);
         const options: FinanceFormData[] = [];
         querySnapshot.forEach((doc) => {
-          options.push({ id: doc.id, ...doc.data() } as FinanceFormData);
+          const data = doc.data();
+          // Ensure calculatedTerms is an object or null, not undefined from Firestore
+          if (data.calculatedTerms === undefined) {
+            data.calculatedTerms = null;
+          }
+          options.push({ id: doc.id, ...data } as FinanceFormData);
         });
         setFinanceOptions(options);
       } catch (error) {
@@ -189,28 +183,29 @@ function CalculatorPage() {
       } finally {
         setIsLoadingOptions(false);
       }
-    } else if (!user && !authLoading) { // If not logged in and auth is not loading, no need to fetch
+    } else if (!user && !authLoading && firebaseReady) { 
         setIsLoadingOptions(false);
+        setFinanceOptions([]); // Clear options if user logs out
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, firebaseReady]);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && firebaseReady) {
       router.push('/login');
-    } else if (user) {
+    } else if (user && firebaseReady) {
       fetchFinanceOptions();
     }
-  }, [user, authLoading, router, fetchFinanceOptions]);
+  }, [user, authLoading, router, fetchFinanceOptions, firebaseReady]);
 
 
   const onSubmit = async (data: FinanceFormData) => {
     if (!user || !db) {
       toast({ title: "Error", description: "You must be logged in to add options." });
+      setIsSubmitting(false); // Ensure isSubmitting is reset
       return;
     }
     setIsSubmitting(true);
     try {
-      // Prepare input for AI, ensuring correct types and handling optionals
       const aiInput = {
         loanAmount: Number(data.loanAmount),
         annualInterestRate: Number(data.annualInterestRate),
@@ -225,7 +220,7 @@ function CalculatorPage() {
         monthlyRepaymentAmount: data.monthlyRepaymentAmount !== undefined ? Number(data.monthlyRepaymentAmount) : undefined,
         loanRenewalPercentage: data.loanRenewalPercentage !== undefined ? Number(data.loanRenewalPercentage) : undefined,
         loanRenewalFixedCost: data.loanRenewalFixedCost !== undefined ? Number(data.loanRenewalFixedCost) : undefined,
-        extraLoanCosts: data.extraLoanCosts?.map(cost => ({ name: cost.name, amount: Number(cost.amount) })) || [],
+        extraLoanCosts: data.extraLoanCosts?.map(cost => ({ name: cost.name, amount: Number(cost.amount || 0) })) || [],
       };
       
       let calculatedResultsRaw;
@@ -238,23 +233,23 @@ function CalculatorPage() {
         return;
       }
       
-      const optionWithTerms = { ...data, calculatedTerms: calculatedResultsRaw, userId: user.uid };
-      const firestoreData = convertToFirestoreCompatible(optionWithTerms);
+      const optionWithUser = { ...data, userId: user.uid, calculatedTerms: calculatedResultsRaw };
+      const firestoreData = convertToFirestoreCompatible(optionWithUser);
 
 
       if (editingOption && editingIndex !== null && editingOption.id) {
         const optionRef = doc(db, "financeOptions", editingOption.id);
         await updateDoc(optionRef, firestoreData);
         const updatedOptions = [...financeOptions];
-        updatedOptions[editingIndex] = { ...firestoreData, id: editingOption.id } as FinanceFormData; // cast needed due to null conversion
+        updatedOptions[editingIndex] = { ...firestoreData, id: editingOption.id };
         setFinanceOptions(updatedOptions);
         toast({ title: "Success", description: "Finance option updated." });
       } else {
         const docRef = await addDoc(collection(db, "financeOptions"), firestoreData);
-        setFinanceOptions([...financeOptions, { ...firestoreData, id: docRef.id } as FinanceFormData]); // cast needed
+        setFinanceOptions(prevOptions => [...prevOptions, { ...firestoreData, id: docRef.id }]);
         toast({ title: "Success", description: "Finance option added." });
       }
-      form.reset(); // Reset form to defaultValues
+      form.reset(); 
       setEditingOption(null);
       setEditingIndex(null);
     } catch (error: any) {
@@ -267,19 +262,26 @@ function CalculatorPage() {
 
   const handleEdit = (index: number) => {
     const optionToEdit = financeOptions[index];
-    // When populating form, convert nulls back to undefined for consistency with defaultValues
-    const formValues = { ...optionToEdit };
-    for (const key in formValues) {
-      if (formValues[key as keyof typeof formValues] === null) {
-        (formValues as any)[key] = undefined;
+    const formValues: Partial<FinanceFormData> = { ...optionToEdit };
+    
+    // Convert nulls from Firestore back to undefined for form consistency, except for calculatedTerms
+    Object.keys(formValues).forEach(key => {
+      const typedKey = key as keyof FinanceFormData;
+      if (formValues[typedKey] === null && typedKey !== 'calculatedTerms') {
+        (formValues as any)[typedKey] = undefined;
       }
+    });
+    if (formValues.calculatedTerms === null) {
+        formValues.calculatedTerms = undefined; // or keep as null if schema expects it
     }
-    if (formValues.calculatedTerms === null) formValues.calculatedTerms = undefined;
+     if (formValues.extraLoanCosts === null) {
+        formValues.extraLoanCosts = [];
+    }
 
 
     setEditingOption(optionToEdit);
     setEditingIndex(index);
-    form.reset(formValues); 
+    form.reset(formValues as FinanceFormData); // Ensure full type match
   };
 
   const handleDelete = async (index: number) => {
@@ -303,14 +305,24 @@ function CalculatorPage() {
       toast({ title: "No Options", description: "Please add at least one finance option to generate a report." });
       return;
     }
-    // Pass Firestore-compatible data (with nulls) if report page expects that, or convert back if needed
     const optionsForReport = financeOptions.map(opt => convertToFirestoreCompatible(opt));
-    router.push(`/report?financeOptions=${encodeURIComponent(JSON.stringify(optionsForReport))}`);
+    sessionStorage.setItem('financeOptionsForReport', JSON.stringify(optionsForReport));
+    router.push('/report');
   };
   
-  if (authLoading || (user && isLoadingOptions)) {
+  if (authLoading || !firebaseReady || (user && isLoadingOptions)) {
     return <div className="container mx-auto p-4 flex justify-center items-center min-h-screen"><p>Loading calculator...</p></div>;
   }
+   if (!user && firebaseReady) {
+    // This case should ideally be handled by the AuthProvider redirect,
+    // but as a fallback:
+    return (
+      <div className="container mx-auto p-4 flex justify-center items-center min-h-screen">
+        <p>Redirecting to login...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="container mx-auto p-4">
@@ -347,7 +359,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Loan Amount (Naira)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 1000000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="E.g., 1000000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -360,7 +372,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Annual Interest Rate (%)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 15" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="E.g., 15" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -373,7 +385,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Loan Term (Months)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 12" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="E.g., 12" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -386,7 +398,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Insurance Rate (% of loan amount, annual)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Optional, e.g., 0.5" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="Optional, e.g., 0.5" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -399,7 +411,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Insurance Amount (Fixed, annual)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Optional, e.g., 5000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="Optional, e.g., 5000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -412,7 +424,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Security Deposit (Naira)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 50000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="E.g., 50000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -445,7 +457,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Monthly Repayment Amount (Naira or %)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 50000 or 5 (for %)" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                        <Input type="number" placeholder="E.g., 50000 or 5 (for %)" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -520,7 +532,7 @@ function CalculatorPage() {
                         <FormItem>
                           <FormLabel>Loan Renewal Fee (% of loan amount)</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Optional, e.g., 1" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                            <Input type="number" placeholder="Optional, e.g., 1" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -533,7 +545,7 @@ function CalculatorPage() {
                         <FormItem>
                           <FormLabel>Loan Renewal Fee (Fixed Cost)</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Optional, e.g., 2000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                            <Input type="number" placeholder="Optional, e.g., 2000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -554,7 +566,7 @@ function CalculatorPage() {
                       name={`extraLoanCosts.${index}.name`}
                       render={({ field }) => (
                         <FormItem className="flex-grow">
-                           <FormLabel className="sr-only">Cost Name</FormLabel>
+                           <FormLabel className="sr-only">Cost Name {index + 1}</FormLabel>
                           <FormControl>
                             <Input placeholder="Cost Name (e.g., Admin Fee)" {...field} />
                           </FormControl>
@@ -567,9 +579,9 @@ function CalculatorPage() {
                       name={`extraLoanCosts.${index}.amount`}
                       render={({ field }) => (
                         <FormItem>
-                           <FormLabel className="sr-only">Cost Amount</FormLabel>
+                           <FormLabel className="sr-only">Cost Amount {index + 1}</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Amount" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
+                            <Input type="number" placeholder="Amount" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.valueAsNumber || undefined)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -611,6 +623,9 @@ function CalculatorPage() {
         {financeOptions.length === 0 && !isLoadingOptions && (
           <p className="text-muted-foreground">No finance options added yet. Fill out the form above to add your first option.</p>
         )}
+         {isLoadingOptions && financeOptions.length === 0 && (
+          <p className="text-muted-foreground">Loading saved options...</p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {financeOptions.map((option, index) => (
             <Card key={option.id || index} className="shadow-md rounded-lg">
@@ -621,7 +636,7 @@ function CalculatorPage() {
               <CardContent className="text-sm space-y-1">
                 <p>Interest Rate: {option.annualInterestRate}% p.a.</p>
                 <p>Term: {option.loanTermMonths} months</p>
-                {option.calculatedTerms && (
+                {option.calculatedTerms && typeof option.calculatedTerms === 'object' && option.calculatedTerms !== null && (
                   <>
                     <Separator className="my-2" />
                     <p className="font-semibold">Calculated Results:</p>
@@ -653,5 +668,3 @@ function CalculatorPage() {
 }
 
 export default CalculatorPage;
-
-    
