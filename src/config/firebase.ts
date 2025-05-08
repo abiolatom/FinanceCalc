@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth'; // Import Auth type
 import { getFirestore } from 'firebase/firestore';
 
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -10,9 +10,9 @@ const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
 const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 const measurementId = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID;
 
-let auth: any = null;
-let db: any = null;
-let googleAuthProvider: any = null;
+let auth: Auth | undefined = undefined; // Changed from: let auth: any = null;
+let db: any = null; // Firestore instance type can be more specific if needed
+let googleAuthProvider: GoogleAuthProvider | undefined = undefined; // Ensure consistent typing
 let firebaseApp: FirebaseApp | null = null;
 
 // Initialize Firebase only on the client-side
@@ -67,4 +67,3 @@ if (typeof window !== 'undefined') {
 }
 
 export { auth, db, googleAuthProvider, firebaseApp };
-
