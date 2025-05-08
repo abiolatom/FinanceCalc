@@ -1,7 +1,7 @@
 'use client';
 
-import type { FinanceOption, CalculatedTerms } from '@/types/finance';
-import { calculateLoanTerm } from '@/ai/flows/calculate-loan-term';
+import type { FinanceOption } from '@/types/finance'; // CalculatedTerms might need to be defined or imported if used explicitly
+import { calculateLoanTerm, CalculateLoanTermOutput } from '@/ai/flows/calculate-loan-term';
 import { generateComparativeReport } from '@/ai/flows/generate-comparative-report';
 import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
@@ -17,14 +17,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+// Dialog components are not used in this version, can be removed if not planned for immediate use
+// import {
+//   Dialog,
+//   DialogContent,
+//   DialogDescription,
+//   DialogHeader,
+//   DialogTitle,
+//   DialogTrigger,
+// } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -35,16 +36,19 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// Label is not directly used, FormLabel is used instead
+// import { Label } from '@/components/ui/label';
+// Select components are not used in this version
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
+// Textarea is not used in this version
+// import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { IconButton } from '@/components/icon-button';
@@ -58,7 +62,7 @@ const extraLoanCostSchema = z.object({
   name: z.string().min(1, 'Cost name is required'),
   amount: z.preprocess(
     (val) => (val === '' || val === undefined || val === null ? undefined : Number(val)),
-    z.number({ invalid_type_error: 'Must be a number' }).positive('Must be positive')
+    z.number({ invalid_type_error: 'Must be a number' }).positive('Must be positive').optional() // Made optional to align with default value
   ),
 });
 
@@ -106,10 +110,31 @@ const financeOptionSchema = z.object({
     z.number({ invalid_type_error: 'Must be a number' }).nonnegative('Cannot be negative').optional()
   ),
   extraLoanCosts: z.array(extraLoanCostSchema).optional(),
-  calculatedTerms: z.any().optional(), // To store results from AI
+  calculatedTerms: z.custom<Partial<CalculateLoanTermOutput> | null>((val) => val === null || typeof val === 'object').optional(),
 });
 
 type FinanceFormData = z.infer<typeof financeOptionSchema>;
+
+// Helper function to convert undefined values to null for Firestore
+function convertToFirestoreCompatible(obj: any): any {
+  if (obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(convertToFirestoreCompatible);
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const newObj: Record<string, any> = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        newObj[key] = convertToFirestoreCompatible(obj[key]);
+      }
+    }
+    return newObj;
+  }
+  return obj;
+}
+
 
 function CalculatorPage() {
   const { user, loading: authLoading } = useAuth();
@@ -138,6 +163,7 @@ function CalculatorPage() {
       loanRenewalPercentage: undefined,
       loanRenewalFixedCost: undefined,
       extraLoanCosts: [],
+      calculatedTerms: undefined,
     },
   });
 
@@ -148,6 +174,7 @@ function CalculatorPage() {
 
   const fetchFinanceOptions = useCallback(async () => {
     if (user && db) {
+      setIsLoadingOptions(true);
       try {
         const q = query(collection(db, "financeOptions"), where("userId", "==", user.uid));
         const querySnapshot = await getDocs(q);
@@ -158,14 +185,14 @@ function CalculatorPage() {
         setFinanceOptions(options);
       } catch (error) {
         console.error("Error fetching finance options: ", error);
-        toast({ title: "Error", description: "Failed to load saved finance options." });
+        toast({ title: "Error", description: "Failed to load saved finance options.", variant: "destructive" });
       } finally {
         setIsLoadingOptions(false);
       }
-    } else {
-      setIsLoadingOptions(false);
+    } else if (!user && !authLoading) { // If not logged in and auth is not loading, no need to fetch
+        setIsLoadingOptions(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -183,45 +210,51 @@ function CalculatorPage() {
     }
     setIsSubmitting(true);
     try {
-      let calculatedResults;
+      // Prepare input for AI, ensuring correct types and handling optionals
+      const aiInput = {
+        loanAmount: Number(data.loanAmount),
+        annualInterestRate: Number(data.annualInterestRate),
+        loanTermMonths: Number(data.loanTermMonths),
+        securityDeposit: Number(data.securityDeposit),
+        monthlyRepaymentIsPercentage: data.monthlyRepaymentIsPercentage,
+        loanAmountPaidAtTermEnd: data.loanAmountPaidAtTermEnd,
+        securityDepositRepayable: data.securityDepositRepayable,
+        canRenew: data.canRenew,
+        insuranceRatePercentage: data.insuranceRatePercentage !== undefined ? Number(data.insuranceRatePercentage) : undefined,
+        insuranceAmount: data.insuranceAmount !== undefined ? Number(data.insuranceAmount) : undefined,
+        monthlyRepaymentAmount: data.monthlyRepaymentAmount !== undefined ? Number(data.monthlyRepaymentAmount) : undefined,
+        loanRenewalPercentage: data.loanRenewalPercentage !== undefined ? Number(data.loanRenewalPercentage) : undefined,
+        loanRenewalFixedCost: data.loanRenewalFixedCost !== undefined ? Number(data.loanRenewalFixedCost) : undefined,
+        extraLoanCosts: data.extraLoanCosts?.map(cost => ({ name: cost.name, amount: Number(cost.amount) })) || [],
+      };
+      
+      let calculatedResultsRaw;
       try {
-         calculatedResults = await calculateLoanTerm({
-          ...data,
-          loanAmount: Number(data.loanAmount),
-          annualInterestRate: Number(data.annualInterestRate),
-          loanTermMonths: Number(data.loanTermMonths),
-          insuranceRatePercentage: data.insuranceRatePercentage ? Number(data.insuranceRatePercentage) : undefined,
-          insuranceAmount: data.insuranceAmount ? Number(data.insuranceAmount) : undefined,
-          securityDeposit: Number(data.securityDeposit),
-          monthlyRepaymentAmount: data.monthlyRepaymentAmount ? Number(data.monthlyRepaymentAmount) : undefined,
-          loanRenewalPercentage: data.loanRenewalPercentage ? Number(data.loanRenewalPercentage) : undefined,
-          loanRenewalFixedCost: data.loanRenewalFixedCost ? Number(data.loanRenewalFixedCost) : undefined,
-          extraLoanCosts: data.extraLoanCosts?.map(cost => ({...cost, amount: Number(cost.amount)})) || [],
-        });
+         calculatedResultsRaw = await calculateLoanTerm(aiInput);
       } catch (aiError: any) {
         console.error("AI calculation error:", aiError);
         toast({title: "AI Calculation Error", description: aiError.message || "Failed to calculate terms with AI. Please check inputs.", variant: "destructive"});
         setIsSubmitting(false);
         return;
       }
+      
+      const optionWithTerms = { ...data, calculatedTerms: calculatedResultsRaw, userId: user.uid };
+      const firestoreData = convertToFirestoreCompatible(optionWithTerms);
 
-      const optionWithTerms = { ...data, calculatedTerms: calculatedResults, userId: user.uid };
 
       if (editingOption && editingIndex !== null && editingOption.id) {
-        // Update existing option in Firestore
         const optionRef = doc(db, "financeOptions", editingOption.id);
-        await updateDoc(optionRef, optionWithTerms);
+        await updateDoc(optionRef, firestoreData);
         const updatedOptions = [...financeOptions];
-        updatedOptions[editingIndex] = { ...optionWithTerms, id: editingOption.id };
+        updatedOptions[editingIndex] = { ...firestoreData, id: editingOption.id } as FinanceFormData; // cast needed due to null conversion
         setFinanceOptions(updatedOptions);
         toast({ title: "Success", description: "Finance option updated." });
       } else {
-        // Add new option to Firestore
-        const docRef = await addDoc(collection(db, "financeOptions"), optionWithTerms);
-        setFinanceOptions([...financeOptions, { ...optionWithTerms, id: docRef.id }]);
+        const docRef = await addDoc(collection(db, "financeOptions"), firestoreData);
+        setFinanceOptions([...financeOptions, { ...firestoreData, id: docRef.id } as FinanceFormData]); // cast needed
         toast({ title: "Success", description: "Finance option added." });
       }
-      form.reset();
+      form.reset(); // Reset form to defaultValues
       setEditingOption(null);
       setEditingIndex(null);
     } catch (error: any) {
@@ -234,9 +267,19 @@ function CalculatorPage() {
 
   const handleEdit = (index: number) => {
     const optionToEdit = financeOptions[index];
+    // When populating form, convert nulls back to undefined for consistency with defaultValues
+    const formValues = { ...optionToEdit };
+    for (const key in formValues) {
+      if (formValues[key as keyof typeof formValues] === null) {
+        (formValues as any)[key] = undefined;
+      }
+    }
+    if (formValues.calculatedTerms === null) formValues.calculatedTerms = undefined;
+
+
     setEditingOption(optionToEdit);
     setEditingIndex(index);
-    form.reset(optionToEdit); // Populate form with option data
+    form.reset(formValues); 
   };
 
   const handleDelete = async (index: number) => {
@@ -251,7 +294,7 @@ function CalculatorPage() {
       toast({ title: "Success", description: "Finance option deleted." });
     } catch (error: any) {
       console.error("Error deleting finance option: ", error);
-      toast({ title: "Error", description: error.message || "Failed to delete finance option." });
+      toast({ title: "Error", description: error.message || "Failed to delete finance option.", variant: "destructive" });
     }
   };
 
@@ -260,19 +303,14 @@ function CalculatorPage() {
       toast({ title: "No Options", description: "Please add at least one finance option to generate a report." });
       return;
     }
-    router.push(`/report?financeOptions=${encodeURIComponent(JSON.stringify(financeOptions))}`);
+    // Pass Firestore-compatible data (with nulls) if report page expects that, or convert back if needed
+    const optionsForReport = financeOptions.map(opt => convertToFirestoreCompatible(opt));
+    router.push(`/report?financeOptions=${encodeURIComponent(JSON.stringify(optionsForReport))}`);
   };
   
-  if (authLoading || isLoadingOptions) {
+  if (authLoading || (user && isLoadingOptions)) {
     return <div className="container mx-auto p-4 flex justify-center items-center min-h-screen"><p>Loading calculator...</p></div>;
   }
-
-  if (!user && !authLoading) {
-    // This should ideally not be reached if AuthProvider handles redirection correctly
-    // but as a fallback:
-    return <div className="container mx-auto p-4 flex justify-center items-center min-h-screen"><p>Redirecting to login...</p></div>;
-  }
-
 
   return (
     <div className="container mx-auto p-4">
@@ -309,7 +347,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Loan Amount (Naira)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 1000000" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="E.g., 1000000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -322,7 +360,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Annual Interest Rate (%)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 15" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="E.g., 15" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -335,7 +373,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Loan Term (Months)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 12" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                        <Input type="number" placeholder="E.g., 12" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -348,7 +386,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Insurance Rate (% of loan amount, annual)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Optional, e.g., 0.5" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="Optional, e.g., 0.5" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -361,7 +399,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Insurance Amount (Fixed, annual)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Optional, e.g., 5000" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="Optional, e.g., 5000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -374,7 +412,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Security Deposit (Naira)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 50000" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="E.g., 50000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -407,7 +445,7 @@ function CalculatorPage() {
                     <FormItem>
                       <FormLabel>Monthly Repayment Amount (Naira or %)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="E.g., 50000 or 5 (for %)" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="E.g., 50000 or 5 (for %)" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -482,7 +520,7 @@ function CalculatorPage() {
                         <FormItem>
                           <FormLabel>Loan Renewal Fee (% of loan amount)</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Optional, e.g., 1" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                            <Input type="number" placeholder="Optional, e.g., 1" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -495,7 +533,7 @@ function CalculatorPage() {
                         <FormItem>
                           <FormLabel>Loan Renewal Fee (Fixed Cost)</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Optional, e.g., 2000" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                            <Input type="number" placeholder="Optional, e.g., 2000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -531,7 +569,7 @@ function CalculatorPage() {
                         <FormItem>
                            <FormLabel className="sr-only">Cost Amount</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Amount" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                            <Input type="number" placeholder="Amount" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -615,3 +653,5 @@ function CalculatorPage() {
 }
 
 export default CalculatorPage;
+
+    
